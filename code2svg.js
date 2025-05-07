@@ -23,7 +23,7 @@ function loadCss(filename) {
         }
     }   
 
-    console.log(colorMap.entries());
+    //console.log(colorMap.entries());
 }
 
 function findColor(clazz) {
@@ -67,7 +67,7 @@ function tokenize(code, language) {
     const html = hljs.highlight(code, {language: 'ts'}).value;
     const root = parse(html);
     const tokens = tokenizeHtmlElementList(root.childNodes);
-    console.log(tokens);
+    //console.log(tokens);
     return tokens;
 }
 
@@ -98,13 +98,15 @@ function tokenizeHtmlElementList(elemList) {
     return tokens;
 }
 
-function generatePaths(code, language) {
-    let y = 0;
+function generatePaths(code, language, x, y) {
+    x = x || 0;
+    y = y || 0;
     let maxX = 0, maxY = 0;
+    let initialX = x;
     const paths = [];
     for(let codeLine of code.split("\n")) {
         const tokens = tokenize(codeLine, language);
-        let x = 0, lastHeight = 0;
+        let lastHeight = 0;
         for (let token of tokens) {
             let [path, width, height] = getPath(token, x, y);
             paths.push(path);
@@ -115,6 +117,7 @@ function generatePaths(code, language) {
             lastHeight = height;
         }
         y = y + lastHeight;
+        x = initialX
         if (y > maxY) {
             maxY = y;
         }
@@ -128,16 +131,54 @@ function splitCodeFile(filename) {
     return parts;
 }
 
-loadCss('theme.css');
-
-const snippets = splitCodeFile('code.ts');
-let index = 0;
-for (let snippet of snippets) {
-
-    const [paths, width, height] = generatePaths(snippet, 'ts');
-    outputFile(paths, width, height, "output"+ (index++) + ".svg");
-
+function readCodeFile(filename) {
+    const content = fs.readFileSync(filename, 'utf8');
+    return content;
 }
 
+loadCss('theme.css');
 
 
+/*const snippets = splitCodeFile('code.ts');
+let index = 0;
+for (let snippet of snippets) {
+    const [paths, width, height] = generatePaths(snippet, 'ts', 0, 0);
+    outputFile(paths, width, height, "output"+ (index++) + ".svg");
+}*/
+
+
+const snippet = readCodeFile('code-typing.ts');
+let x = 0;
+let y = 0;
+
+let total_width = 0;
+let total_height = 0;
+let frame_width = 0;
+let frame_height = 0;
+let paths = [], firstPath = [];
+
+// Get slice dimensions
+[firstPath, frame_width, frame_height] = generatePaths(snippet, 'ts', x, y);
+
+// Compute each frame
+for (let i=1; i<=snippet.length; i++) {    
+    const [current_paths, maxX, maxY] = generatePaths(snippet.substring(0, i), 'ts', x, y);
+
+    if (maxX > total_width) total_width = maxX;
+    if (maxY > total_height) total_height = maxY;
+
+    if (x > 2000) {
+        x = 0;
+        y += frame_height;
+    }
+    else {
+        x += frame_width;
+    }
+
+    paths.push(...current_paths);     
+}
+
+console.log("Total width: " + total_width + ", height: " + total_height + ", frame width: " + frame_width + ", height: " + frame_height);
+
+
+outputFile(paths.reverse(), total_width, total_height, "output.svg");
